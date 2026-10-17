@@ -1,0 +1,7 @@
+src/
+CLAUDE.md
+.DS_Store
+bin/
+obj/
+*.user
+.vs/
