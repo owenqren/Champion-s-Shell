@@ -1,0 +1,72 @@
+<!-- SDK-style project; the .NET SDK (dotnet 10 on this Mac) builds it with `dotnet build`. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Build settings. -->
+  <PropertyGroup>
+    <!-- .NET Framework 4.7.2: the runtime the Hollow Knight 1.5.78 Modding API targets. -->
+    <TargetFramework>net472</TargetFramework>
+    <!-- C# 10 is the newest version that compiles cleanly for net472 without extra polyfills. -->
+    <LangVersion>10.0</LangVersion>
+    <!-- Name of the built file, ChampionsShell.dll, which the Modding API loads from Mods/ChampionsShell/. -->
+    <AssemblyName>ChampionsShell</AssemblyName>
+    <!-- Root namespace used by the mod's own classes. -->
+    <RootNamespace>ChampionsShell</RootNamespace>
+    <!-- Mod version; ChampionsShell.cs reads it at runtime to report it to the Modding API menu. -->
+    <Version>0.1.0</Version>
+    <!-- Lets the compiler warn about possible null values in the mod's own code. -->
+    <Nullable>enable</Nullable>
+    <!-- Keeps the build from copying game and Modding API DLLs next to ChampionsShell.dll; the game already has them. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- Where the separate 1.5.78 copy of the game lives. Never the Steam install (see CLAUDE.md). -->
+  <PropertyGroup>
+    <!-- Folder holding the 1.5.78 game copy; override with `dotnet build -p:HollowKnightCopy=/path/to/copy`. -->
+    <HollowKnightCopy Condition="'$(HollowKnightCopy)' == ''">$(HOME)/HKModding/HollowKnight-1.5.78</HollowKnightCopy>
+    <!-- Managed folder inside the Mac app bundle, where Assembly-CSharp.dll and the Modding API files are. -->
+    <HollowKnightManaged>$(HollowKnightCopy)/hollow_knight.app/Contents/Resources/Data/Managed</HollowKnightManaged>
+    <!-- Install folder for this mod inside the copy; the Modding API loads every DLL under Managed/Mods/. -->
+    <ModInstallDir>$(HollowKnightManaged)/Mods/ChampionsShell</ModInstallDir>
+  </PropertyGroup>
+
+  <!-- Supplies the .NET Framework 4.7.2 reference assemblies, which macOS does not have installed. -->
+  <ItemGroup>
+    <!-- Build-time only; nothing from this package ships with the mod. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Game and Modding API assemblies, read from the 1.5.78 copy. Private=false keeps them out of the build output. -->
+  <ItemGroup>
+    <!-- The game's code with the Modding API patched in: HeroController, HealthManager, PlayerData, ModHooks, Mod. -->
+    <Reference Include="Assembly-CSharp"><HintPath>$(HollowKnightManaged)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <!-- Generated On.* hooks for game methods, e.g. On.HealthManager.TakeDamage; ships with the Modding API. -->
+    <Reference Include="MMHOOK_Assembly-CSharp"><HintPath>$(HollowKnightManaged)/MMHOOK_Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <!-- Generated On.* hooks for PlayMaker methods, e.g. On.PlayMakerFSM.OnEnable for the Nailsmith edit. -->
+    <Reference Include="MMHOOK_PlayMaker"><HintPath>$(HollowKnightManaged)/MMHOOK_PlayMaker.dll</HintPath><Private>false</Private></Reference>
+    <!-- MonoMod runtime that the On.* hooks above are built on. -->
+    <Reference Include="MonoMod.RuntimeDetour"><HintPath>$(HollowKnightManaged)/MonoMod.RuntimeDetour.dll</HintPath><Private>false</Private></Reference>
+    <!-- MonoMod helpers the generated hooks use internally. -->
+    <Reference Include="MonoMod.Utils"><HintPath>$(HollowKnightManaged)/MonoMod.Utils.dll</HintPath><Private>false</Private></Reference>
+    <!-- PlayMaker FSM types (PlayMakerFSM, FsmState, FsmStateAction) for editing NPC behaviour. -->
+    <Reference Include="PlayMaker"><HintPath>$(HollowKnightManaged)/PlayMaker.dll</HintPath><Private>false</Private></Reference>
+    <!-- Unity core types: GameObject, MonoBehaviour, Vector3, Debug. -->
+    <Reference Include="UnityEngine"><HintPath>$(HollowKnightManaged)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <!-- The module where Unity 2020 actually defines most core types. -->
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(HollowKnightManaged)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- Unity UI (Canvas, Image, Text) for drawing the boss health bar. -->
+    <Reference Include="UnityEngine.UI"><HintPath>$(HollowKnightManaged)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <!-- Canvas rendering types that UnityEngine.UI depends on. -->
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(HollowKnightManaged)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- Font and text rendering used by UI Text on the health bar. -->
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(HollowKnightManaged)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <!-- After each build, copy the mod into the 1.5.78 copy so it can be tested. Never targets the Steam install. -->
+  <Target Name="InstallIntoGameCopy" AfterTargets="Build" Condition="Exists('$(HollowKnightManaged)/Assembly-CSharp.dll')">
+    <!-- Creates Mods/ChampionsShell/ inside the copy if it is missing. -->
+    <MakeDir Directories="$(ModInstallDir)" />
+    <!-- Copies ChampionsShell.dll (and its .pdb for readable error traces) into that folder. -->
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ModInstallDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
