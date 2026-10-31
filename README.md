@@ -9,7 +9,7 @@ A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired 
 - **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now. You find it floating on the path from the Dirtmouth bench to the well. Touching it collects it and shows a short popup.
 - **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. During a boss fight, one wide bar shows at the top of the screen instead, starting from your first hit.
 - **Finishing Blow.** Once the charm is upgraded, your nail does bonus damage to enemies low on health. Each of the three tiers raises both the health limit (25%, 32%, 40%) and the bonus (+20%, +28%, +35%). Upgrades can't be earned yet.
-- **Not tested in game yet.** The boss bar at the top of the screen, and the bars in Godhome.
+- **Not tested in game yet.** The bars in Godhome, and the top boss bar on bosses other than False Knight.
 
 ## Planned features
 
@@ -91,7 +91,7 @@ An enemy counts as a boss if any of these is true:
 2. Its private `unlockBossScene` field is set, meaning it unlocks a Hall of Gods statue.
 3. Its object name is in `ExtraBossNames`, a manual list that's empty for now.
 
-`Refresh()` runs every frame. It removes dead or destroyed enemies, raises `MaxHp` if a phase refills a boss, and sets `InFight` once an enemy has lost HP. HP is read directly each frame instead of hooking damage, because some boss FSMs change `hp` themselves.
+`Refresh()` runs every frame. It removes dead or destroyed enemies (including those reported through `HealthManager.OnDeath`, which False Knight uses without setting `isDead`), raises `MaxHp` if a phase refills a boss, and sets `InFight` once an enemy has lost HP. HP is read directly each frame instead of hooking damage, because some boss FSMs change `hp` themselves.
 
 ### Drawing the bars
 
@@ -104,7 +104,7 @@ Each frame, `Update()`:
 3. For each living enemy, adds bosses to the docked bar's totals. For normal enemies, it finds the point above the head with `AboveOnScreen`, then checks `CanSee`.
 4. Draws a bar for each enemy that passes both.
 5. Hides the bars of enemies that didn't.
-6. Shows the docked boss bar at the top of the screen once a boss has lost HP. That bar shows the combined HP of all bosses in the fight. False Knight is the exception: he's fought in rounds, so it shows only the part in play, body or head.
+6. Shows the docked boss bar at the top of the screen once a boss has lost HP. That bar shows the combined HP of all bosses in the fight. False Knight is the exception: he's fought in rounds, so it shows only the part in play, body or head. When the game refills one part's HP, its round is over and the bar moves to the other part.
 
 **Line of sight.** `CanSee` draws a line from the Knight to the enemy's middle and to its top. If terrain (layer mask `256`) blocks both, the enemy is out of sight. A bar stays for `SeenGraceTime` after that, so it doesn't flicker at corners. Bosses skip this check, since they never get a bar above them.
 

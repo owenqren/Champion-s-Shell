@@ -160,11 +160,11 @@ namespace ChampionsShell
                         {
                             // Shows the docked bar this frame.
                             dock = true;
-                            // A part fought in rounds is held back; the one whose HP changed last is the one in play.
+                            // Only the part in play of a boss fought in rounds counts (EnemyTracker keeps TrackedEnemy.InPlay).
                             if (enemy.IsStaged)
                             {
-                                // Keeps the most recently changed part.
-                                if (stagedPart == null || enemy.LastHpChangeTime > stagedPart.LastHpChangeTime) stagedPart = enemy;
+                                // Keeps that part for after the loop.
+                                if (enemy.InPlay) stagedPart = enemy;
                             }
                             // Other bosses add to the totals, so multi-part bosses share one bar.
                             else
