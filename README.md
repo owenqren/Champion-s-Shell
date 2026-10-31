@@ -104,7 +104,7 @@ Each frame, `Update()`:
 3. For each living enemy, adds bosses to the docked bar's totals. For normal enemies, it finds the point above the head with `AboveOnScreen`, then checks `CanSee`.
 4. Draws a bar for each enemy that passes both.
 5. Hides the bars of enemies that didn't.
-6. Shows the docked boss bar at the top of the screen once a boss has lost HP. That bar shows the combined HP of all bosses in the fight.
+6. Shows the docked boss bar at the top of the screen once a boss has lost HP. That bar shows the combined HP of all bosses in the fight. False Knight is the exception: he's fought in rounds, so it shows only the part in play, body or head.
 
 **Line of sight.** `CanSee` draws a line from the Knight to the enemy's middle and to its top. If terrain (layer mask `256`) blocks both, the enemy is out of sight. A bar stays for `SeenGraceTime` after that, so it doesn't flicker at corners. Bosses skip this check, since they never get a bar above them.
 

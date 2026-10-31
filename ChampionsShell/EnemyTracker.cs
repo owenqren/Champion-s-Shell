@@ -34,6 +34,16 @@ namespace ChampionsShell
         // Fallback for enemies with no renderer on the same object: the hitbox bounds.
         public Collider2D? Collider;
 
+        // True for a boss fought in rounds, one part at a time (False Knight's body, then head). The top bar shows only
+        // the part in play, instead of adding the parts together.
+        public bool IsStaged;
+
+        // HP at the last Refresh, used to notice changes.
+        public int LastHp;
+
+        // Time.time of the last HP change, which tells EnemyHealthBars which staged part is in play.
+        public float LastHpChangeTime;
+
         // Time.time when the Knight last had a clear line to this enemy; EnemyHealthBars uses it so bars don't flicker
         // at corners. Starts far in the past so an enemy that was never seen has no bar.
         public float LastSeenTime = -100f;
@@ -47,6 +57,12 @@ namespace ChampionsShell
         private static readonly HashSet<string> ExtraBossNames = new HashSet<string>
         {
         };
+
+        // Start of the object name of False Knight's body (GameObject.name "False Knight New" in the log).
+        private const string StagedBossPrefix = "False Knight";
+
+        // GameObject.name of False Knight's head. It's generic, so it only counts while a False Knight is tracked.
+        private const string StagedHeadName = "Head";
 
         // Enemies currently tracked; EnemyHealthBars reads this every frame. Entries are added by the hook below and
         // removed by Refresh(), so the list never grows across scene changes.
@@ -84,7 +100,36 @@ namespace ChampionsShell
                 Renderer = self.GetComponent<Renderer>(),
                 // Hitbox on the enemy object, used if there's no renderer. Also looked up once.
                 Collider = self.GetComponent<Collider2D>(),
+                // Starts the change detection at the current HP.
+                LastHp = self.hp,
             });
+            // Re-marks False Knight's parts, since his body and head can start in either order.
+            MarkStagedParts();
+        }
+
+        // Marks False Knight's body and head as one staged boss, once his body is tracked.
+        private void MarkStagedParts()
+        {
+            // True if a tracked enemy is False Knight's body.
+            bool bodyTracked = false;
+            // Checks every tracked enemy; destroyed ones are skipped because Refresh hasn't removed them yet.
+            foreach (TrackedEnemy enemy in enemies) if (enemy.Health != null && enemy.Health.gameObject.name.StartsWith(StagedBossPrefix)) bodyTracked = true;
+            // Nothing to mark without the body.
+            if (!bodyTracked) return;
+            // Goes through the enemies again to mark the parts.
+            foreach (TrackedEnemy enemy in enemies)
+            {
+                // Skips destroyed objects.
+                if (enemy.Health == null) continue;
+                // The enemy's scene object name.
+                string name = enemy.Health.gameObject.name;
+                // Only the body and head are parts of this fight.
+                if (!name.StartsWith(StagedBossPrefix) && name != StagedHeadName) continue;
+                // Uses the top bar, never a small bar above it.
+                enemy.IsBoss = true;
+                // Shows one part at a time.
+                enemy.IsStaged = true;
+            }
         }
 
         // Finds the tracked entry for a HealthManager, or null if it isn't tracked. Used by FinishingBlow for MaxHp; a
@@ -131,6 +176,8 @@ namespace ChampionsShell
                 // Current HP (HealthManager.hp); some FSMs change it directly, so it's read rather than hooked
                 // (a hook on TakeDamage would miss those changes).
                 int hp = enemy.Health.hp;
+                // Notes when HP changes, whether from a hit or a refill at the start of a round.
+                if (hp != enemy.LastHp) { enemy.LastHp = hp; enemy.LastHpChangeTime = Time.time; }
                 // Raises the max if a phase refilled HP above it.
                 if (hp > enemy.MaxHp) enemy.MaxHp = hp;
                 // Marks the fight as started the first time the enemy is below full HP.

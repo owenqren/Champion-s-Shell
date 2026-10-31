@@ -63,6 +63,8 @@
     <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(HollowKnightManaged)/UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
     <!-- 2D physics types; Collider2D bounds are the health bar's fallback for a boss's top edge. -->
     <Reference Include="UnityEngine.Physics2DModule"><HintPath>$(HollowKnightManaged)/UnityEngine.Physics2DModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- Keyboard input for the local test cheats; only referenced when the gitignored TestCheats.cs exists. -->
+    <Reference Include="UnityEngine.InputLegacyModule" Condition="Exists('TestCheats.cs')"><HintPath>$(HollowKnightManaged)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
     <!-- SFCore library (installed in the copy's Mods/SFCore/): EasyCharm and CharmHelper add the custom charm. -->
     <Reference Include="SFCore"><HintPath>$(HollowKnightManaged)/Mods/SFCore/SFCore.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>

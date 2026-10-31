@@ -138,6 +138,8 @@ namespace ChampionsShell
             int bossMax = 0;
             // True when a boss is being fought, so the docked bar shows.
             bool dock = false;
+            // The part in play of a boss fought in rounds, which the docked bar shows alone.
+            TrackedEnemy? stagedPart = null;
             // Places the bars; when not active nothing is placed, so the clean-up below hides every bar.
             if (active)
             {
@@ -156,12 +158,22 @@ namespace ChampionsShell
                         // before its fight starts.
                         if (enemy.InFight)
                         {
-                            // Adds its HP to the docked bar's totals, whether or not it's on screen.
-                            bossHp += enemy.Health.hp;
-                            // Adds its max HP too.
-                            bossMax += enemy.MaxHp;
                             // Shows the docked bar this frame.
                             dock = true;
+                            // A part fought in rounds is held back; the one whose HP changed last is the one in play.
+                            if (enemy.IsStaged)
+                            {
+                                // Keeps the most recently changed part.
+                                if (stagedPart == null || enemy.LastHpChangeTime > stagedPart.LastHpChangeTime) stagedPart = enemy;
+                            }
+                            // Other bosses add to the totals, so multi-part bosses share one bar.
+                            else
+                            {
+                                // Adds its HP, whether or not it's on screen.
+                                bossHp += enemy.Health.hp;
+                                // Adds its max HP too.
+                                bossMax += enemy.MaxHp;
+                            }
                         }
                         // Nothing to draw above a boss.
                         continue;
@@ -180,6 +192,8 @@ namespace ChampionsShell
                     shownThisFrame.Add(enemy);
                 }
             }
+            // Adds only the part in play of a boss fought in rounds, so the bar shows that round alone.
+            if (stagedPart != null) { bossHp += stagedPart.Health.hp; bossMax += stagedPart.MaxHp; }
             // Puts away bars whose enemy got no bar this frame (died, went off screen, charm unequipped, game paused).
             toRemove.Clear();
             // Finds them.
