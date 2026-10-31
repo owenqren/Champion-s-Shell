@@ -24,14 +24,20 @@ namespace ChampionsShell
         // Unity's default for sprites is 100, which keeps the PNG's pixel size equal to its size in the menu.
         private const float IconPixelsPerUnit = 100f;
 
+        // Upgrade tier: 0 is the base charm. Restored and saved by ChampionsShell (LocalSettings.UpgradeTier), read by
+        // FinishingBlow and GetDescription.
+        public int Tier { get; set; }
+
         // Name shown in the inventory; the game asks for it through the CHARM_NAME_<id> language key (EasyCharm hooks it
         // via ModHooks.LanguageGetHook).
         protected override string GetName() => "Champion's Shell";
 
-        // Description shown in the inventory, asked for through CHARM_DESC_<id>; the upgrade's ability line is added later.
+        // Description shown in the inventory, asked for through CHARM_DESC_<id>, so it updates as soon as Tier changes.
         // "\n\n" starts a new paragraph in the game's text box.
         protected override string GetDescription() =>
-            "Shell worn by a champion of a kingdom long fallen.\n\nReveals the remaining strength of foes.";
+            "Shell worn by a champion of a kingdom long fallen.\n\nReveals the remaining strength of foes."
+            // Adds the Finishing Blow line once the charm has been upgraded.
+            + (Tier > 0 ? " The bearer's nail strikes harder against foes near defeat." : "");
 
         // Notch cost, asked for through charmCost_<id>; Owen's decision: always 1 notch (upgrades only strengthen the
         // second ability, they never change the cost).

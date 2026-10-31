@@ -2,18 +2,18 @@
 
 A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired by the Champion's Tunic in *Breath of the Wild*: while it is equipped, you can see your enemies' health.
 
-> Status: early development. The charm, its enemy health bars and finding it in the world are built; the second ability and the Nailsmith upgrade are not.
+> Status: early development. The charm, its enemy health bars, finding it in the world and its second ability are built; the Nailsmith upgrade is not.
 
 ## Features so far
 
 - **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now. You find it floating on the path from the Dirtmouth bench to the well. Touching it collects it and shows a short popup.
 - **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. During a boss fight, one wide bar shows at the top of the screen instead, starting from your first hit.
+- **Finishing Blow.** Once the charm is upgraded, your nail does bonus damage to enemies low on health. Each of the three tiers raises both the health limit (25%, 32%, 40%) and the bonus (+20%, +28%, +35%). Upgrades can't be earned yet.
 - **Not tested in game yet.** The boss bar at the top of the screen, and the bars in Godhome.
 
 ## Planned features
 
-- **A second ability.** Upgrading the charm adds a combat bonus. This is not decided yet; bonus damage against bosses and extra soul are the current ideas.
-- **Upgrades at the Nailsmith.** Pay geo and hand over a relic, such as a Wanderer's Journal, to upgrade the charm. Each upgrade makes the second ability stronger. Lemm is unchanged; you just keep the relic instead of selling it.
+- **Upgrades at the Nailsmith.** Pay geo and hand over a relic, such as a Wanderer's Journal, to upgrade the charm. Each upgrade makes Finishing Blow stronger. Lemm is unchanged; you just keep the relic instead of selling it.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ Released under the [MIT License](LICENSE). This covers only this mod's own code 
 
 This section explains how Champion's Shell is put together. For line-by-line detail, read the comments in the code, since every line has one.
 
-The mod is six C# files in `ChampionsShell/`, plus one icon:
+The mod is seven C# files in `ChampionsShell/`, plus one icon:
 
 | File | Job |
 |---|---|
@@ -41,6 +41,7 @@ The mod is six C# files in `ChampionsShell/`, plus one icon:
 | `ChampionsShellCharm.cs` | The charm's name, description, cost and icon. |
 | `EnemyTracker.cs` | Finds enemies and keeps track of their HP. |
 | `EnemyHealthBars.cs` | Draws the bars on screen. |
+| `FinishingBlow.cs` | Bonus nail damage to low-health enemies, by upgrade tier. |
 | `WorldPickup.cs` | Places the charm in the world and collects it on touch. |
 | `PickupPopup.cs` | The short popup shown on collection. |
 | `Resources/ChampionsShell.png` | Placeholder charm icon, built into the DLL. |
@@ -128,9 +129,14 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 | `SeenGraceTime` | `EnemyHealthBars.cs` | How long a bar stays after losing sight of an enemy |
 | `ExtraBossNames` | `EnemyTracker.cs` | Bosses the automatic checks miss |
 | `IconPixelsPerUnit` | `ChampionsShellCharm.cs` | Icon size in the charm menu |
+| `LowHealthByTier`, `DamageByTier` | `FinishingBlow.cs` | When the bonus applies and how strong it is |
 | `TargetScene`, `TargetPosition` | `WorldPickup.cs` | Where the charm is found |
 | `PickupRadius`, `BobHeight`, `BobSpeed` | `WorldPickup.cs` | Pickup distance and bobbing |
 | `ShowTime`, `FadeTime` | `PickupPopup.cs` | How long the popup stays |
+
+### Finishing Blow
+
+`FinishingBlow` hooks `HealthManager.TakeDamage`. If the charm is equipped, its tier is above 0, the hit is `AttackTypes.Nail` and the enemy is at or below its tier's `LowHealthByTier` fraction of its tracked `MaxHp`, it raises `hitInstance.Multiplier`. The game applies that multiplier when it works out damage, so this stacks with other charms. The hook always calls the original method, or the hit would be lost. The tier is `ChampionsShellCharm.Tier`, saved as `LocalSettings.UpgradeTier`.
 
 ### Finding the charm
 

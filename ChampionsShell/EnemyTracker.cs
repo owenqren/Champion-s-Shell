@@ -87,6 +87,16 @@ namespace ChampionsShell
             });
         }
 
+        // Finds the tracked entry for a HealthManager, or null if it isn't tracked. Used by FinishingBlow for MaxHp; a
+        // plain loop is fine because it only runs when a hit lands.
+        public TrackedEnemy? Find(HealthManager health)
+        {
+            // Checks each tracked enemy.
+            foreach (TrackedEnemy enemy in enemies) if (enemy.Health == health) return enemy;
+            // Not tracked.
+            return null;
+        }
+
         // Decides whether a freshly started HealthManager belongs to a boss. The three checks go from most to least
         // reliable; the last one is the manual list for bosses the first two miss.
         private static bool IsBoss(HealthManager health)

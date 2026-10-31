@@ -17,6 +17,9 @@ namespace ChampionsShell
         // Owned / equipped / new flags for Champion's Shell (SFCore's EasyCharmState). Nullable because JSON from a save
         // made before the charm existed has no such field; callers must handle null (see OnLoadLocal).
         public EasyCharmState? Charm;
+
+        // Charm upgrade tier (ChampionsShellCharm.Tier); 0, the base charm, for saves made before upgrades existed.
+        public int UpgradeTier;
     }
 
     // Entry point. The Modding API finds every class that inherits Mod in DLLs under Managed/Mods/ and creates it
@@ -55,6 +58,8 @@ namespace ChampionsShell
             // Applies any settings the Modding API handed over before the charm existed (OnLoadLocal runs early and
             // skips the charm when it's null); a blank state if the save has none.
             newCharm.RestoreCharmState(settings.Charm ?? new EasyCharmState());
+            // Applies the saved upgrade tier the same way.
+            newCharm.Tier = settings.UpgradeTier;
             // Creates the enemy tracker (just the empty list; nothing is hooked until Hook()).
             tracker = new EnemyTracker();
             // Starts watching enemies as they spawn (On.HealthManager.Start). Enemies that already exist when this runs
@@ -68,10 +73,51 @@ namespace ChampionsShell
             // Starts watching for the room that holds the charm, so saves without it find it in the world.
             new WorldPickup(newCharm, popup).Hook();
             // Clears the charm for a new game, so a previously loaded save's flags don't carry over (ModHooks.NewGameHook).
-            ModHooks.NewGameHook += () => charm?.RestoreCharmState(new EasyCharmState());
+            ModHooks.NewGameHook += () => ResetCharm();
+            // Starts the Finishing Blow ability, which needs the tracker for enemies' max HP (FinishingBlow.cs).
+            new FinishingBlow(newCharm, tracker).Hook();
+            // TEMPORARY test cheats on save load (ModHooks.AfterSavegameLoadHook). Remove before release.
+            ModHooks.AfterSavegameLoadHook += _ => ApplyTestCheats();
+            // TEMPORARY test cheats on new game (ModHooks.NewGameHook). Remove before release.
+            ModHooks.NewGameHook += ApplyTestCheats;
             // Writes to ModLog.txt in the copy's save folder (Modding.Loggable.Log); seeing this line proves the mod loaded
             // and shows which charm id SFCore assigned.
             Log($"Initialized, charm id {newCharm.Id}");
+        }
+
+        // TEMPORARY: gives Wayward Compass and turns on no-damage for testing. Both are stored in the save, so a save
+        // played with this keeps them unless they're switched off. Remove before release.
+        private void ApplyTestCheats()
+        {
+            // Unlocks the Charms tab (PlayerData.hasCharm), so the compass can be equipped on a new game.
+            PlayerData.instance.SetBool("hasCharm", true);
+            // Gives Wayward Compass, vanilla charm 2 (PlayerData.gotCharm_2).
+            PlayerData.instance.SetBool("gotCharm_2", true);
+            // The game's own no-damage test flag (PlayerData.invinciTest, checked in HeroController.TakeDamage).
+            PlayerData.instance.SetBool("invinciTest", true);
+            // Only clears the shade if there is one (PlayerData.soulLimited is true while the shade is out).
+            if (!PlayerData.instance.soulLimited) return;
+            // Hands back the geo held by the shade (PlayerData.geoPool).
+            PlayerData.instance.geo += PlayerData.instance.geoPool;
+            // Empties the shade's geo.
+            PlayerData.instance.geoPool = 0;
+            // Removes the shade from its room, using the value the game uses for no shade (PlayerData.shadeScene).
+            PlayerData.instance.shadeScene = "None";
+            // Clears its map marker area (PlayerData.shadeMapZone).
+            PlayerData.instance.shadeMapZone = "";
+            // Restores the full soul vessel, which a shade caps at 66 (PlayerData.EndSoulLimiter).
+            PlayerData.instance.EndSoulLimiter();
+        }
+
+        // Clears the charm's flags and tier for a new game.
+        private void ResetCharm()
+        {
+            // Nothing to reset before Initialize() has created the charm.
+            if (charm == null) return;
+            // Blank owned/equipped/new flags.
+            charm.RestoreCharmState(new EasyCharmState());
+            // Back to the base charm.
+            charm.Tier = 0;
         }
 
         // Called by the Modding API when a save loads, and with blank settings on scene changes (including before
@@ -83,6 +129,8 @@ namespace ChampionsShell
             // Restores owned/equipped/new flags, or blank ones for saves without them; skipped if the charm isn't created yet
             // (Initialize() applies `settings` itself in that case).
             charm?.RestoreCharmState(loaded.Charm ?? new EasyCharmState());
+            // Restores the upgrade tier the same way, if the charm exists yet.
+            if (charm != null) charm.Tier = loaded.UpgradeTier;
         }
 
         // Called by the Modding API when the game saves; returns the charm's current flags to store with the save.
@@ -91,6 +139,8 @@ namespace ChampionsShell
             // Copies the charm's current flags into the settings (EasyCharm.GetCharmState), if the charm exists. The flags
             // live inside EasyCharm at runtime, so they must be copied out here or equipping would not survive a reload.
             if (charm != null) settings.Charm = charm.GetCharmState();
+            // Copies the upgrade tier too, if the charm exists.
+            if (charm != null) settings.UpgradeTier = charm.Tier;
             // Hands the settings to the Modding API to write next to the save.
             return settings;
         }
