@@ -25,6 +25,10 @@ A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired 
 
 The mod changes the game while it runs, using Modding API hooks and edits to PlayMaker FSMs. It does not replace any game files or scenes.
 
+## License
+
+Released under the [MIT License](LICENSE). This covers only this mod's own code and files, not Hollow Knight, which belongs to Team Cherry.
+
 ## How the code works
 
 This section explains how Champion's Shell is put together. For line-by-line detail, read the comments in the code, since every line has one.
