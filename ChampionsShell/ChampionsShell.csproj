@@ -59,6 +59,18 @@
     <Reference Include="UnityEngine.UIModule"><HintPath>$(HollowKnightManaged)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
     <!-- Font and text rendering used by UI Text on the health bar. -->
     <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(HollowKnightManaged)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- Texture2D.LoadImage, used to turn the embedded PNG into the charm icon. -->
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(HollowKnightManaged)/UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- 2D physics types; Collider2D bounds are the health bar's fallback for a boss's top edge. -->
+    <Reference Include="UnityEngine.Physics2DModule"><HintPath>$(HollowKnightManaged)/UnityEngine.Physics2DModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- SFCore library (installed in the copy's Mods/SFCore/): EasyCharm and CharmHelper add the custom charm. -->
+    <Reference Include="SFCore"><HintPath>$(HollowKnightManaged)/Mods/SFCore/SFCore.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <!-- Files built into ChampionsShell.dll so the mod ships as a single DLL. -->
+  <ItemGroup>
+    <!-- Charm icon; ChampionsShellCharm.cs loads it by the resource name ChampionsShell.Resources.ChampionsShell.png. -->
+    <EmbeddedResource Include="Resources/ChampionsShell.png" LogicalName="ChampionsShell.Resources.ChampionsShell.png" />
   </ItemGroup>
 
   <!-- After each build, copy the mod into the 1.5.78 copy so it can be tested. Never targets the Steam install. -->
