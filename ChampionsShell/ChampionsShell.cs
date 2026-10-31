@@ -25,7 +25,8 @@ namespace ChampionsShell
     // Entry point. The Modding API finds every class that inherits Mod in DLLs under Managed/Mods/ and creates it
     // (there must be exactly one per DLL, with a parameterless constructor).
     // ILocalSettings<LocalSettings> makes the Modding API call OnLoadLocal/OnSaveLocal when a save loads or saves.
-    public class ChampionsShell : Mod, ILocalSettings<LocalSettings>
+    // Partial so the gitignored TestCheats.cs can add to this class on a developer's machine.
+    public partial class ChampionsShell : Mod, ILocalSettings<LocalSettings>
     {
         // The charm (ChampionsShellCharm.cs); null until Initialize() runs, so every use before then must null-check.
         private ChampionsShellCharm? charm;
@@ -76,38 +77,15 @@ namespace ChampionsShell
             ModHooks.NewGameHook += () => ResetCharm();
             // Starts the Finishing Blow ability, which needs the tracker for enemies' max HP (FinishingBlow.cs).
             new FinishingBlow(newCharm, tracker).Hook();
-            // TEMPORARY test cheats on save load (ModHooks.AfterSavegameLoadHook). Remove before release.
-            ModHooks.AfterSavegameLoadHook += _ => ApplyTestCheats();
-            // TEMPORARY test cheats on new game (ModHooks.NewGameHook). Remove before release.
-            ModHooks.NewGameHook += ApplyTestCheats;
+            // Sets up local test cheats if TestCheats.cs exists; otherwise the compiler removes this call.
+            SetUpTestCheats();
             // Writes to ModLog.txt in the copy's save folder (Modding.Loggable.Log); seeing this line proves the mod loaded
             // and shows which charm id SFCore assigned.
             Log($"Initialized, charm id {newCharm.Id}");
         }
 
-        // TEMPORARY: gives Wayward Compass and turns on no-damage for testing. Both are stored in the save, so a save
-        // played with this keeps them unless they're switched off. Remove before release.
-        private void ApplyTestCheats()
-        {
-            // Unlocks the Charms tab (PlayerData.hasCharm), so the compass can be equipped on a new game.
-            PlayerData.instance.SetBool("hasCharm", true);
-            // Gives Wayward Compass, vanilla charm 2 (PlayerData.gotCharm_2).
-            PlayerData.instance.SetBool("gotCharm_2", true);
-            // The game's own no-damage test flag (PlayerData.invinciTest, checked in HeroController.TakeDamage).
-            PlayerData.instance.SetBool("invinciTest", true);
-            // Only clears the shade if there is one (PlayerData.soulLimited is true while the shade is out).
-            if (!PlayerData.instance.soulLimited) return;
-            // Hands back the geo held by the shade (PlayerData.geoPool).
-            PlayerData.instance.geo += PlayerData.instance.geoPool;
-            // Empties the shade's geo.
-            PlayerData.instance.geoPool = 0;
-            // Removes the shade from its room, using the value the game uses for no shade (PlayerData.shadeScene).
-            PlayerData.instance.shadeScene = "None";
-            // Clears its map marker area (PlayerData.shadeMapZone).
-            PlayerData.instance.shadeMapZone = "";
-            // Restores the full soul vessel, which a shade caps at 66 (PlayerData.EndSoulLimiter).
-            PlayerData.instance.EndSoulLimiter();
-        }
+        // Implemented only in the gitignored TestCheats.cs. With that file missing, this and its call compile to nothing.
+        partial void SetUpTestCheats();
 
         // Clears the charm's flags and tier for a new game.
         private void ResetCharm()
