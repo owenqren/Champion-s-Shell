@@ -63,33 +63,15 @@ namespace ChampionsShell
             // Builds the on-screen health bars: one persistent GameObject with an overlay canvas that draws a bar for
             // each tracked enemy, only while the charm is equipped (it needs newCharm to read the equipped flag).
             EnemyHealthBars.Create(tracker, newCharm);
-            // TEMPORARY until the world pickup exists: gives the charm when a save is loaded (ModHooks.AfterSavegameLoadHook,
-            // which passes the loaded SaveGameData, ignored here).
-            ModHooks.AfterSavegameLoadHook += _ => GiveCharmForTesting();
-            // TEMPORARY until the world pickup exists: resets the charm for a new game (so a previous save's flags don't
-            // carry over from the static state), then gives it (ModHooks.NewGameHook).
-            ModHooks.NewGameHook += () => { charm?.RestoreCharmState(new EasyCharmState()); GiveCharmForTesting(); };
+            // Builds the hidden popup shown when the charm is collected, using the charm's icon (EasyCharm.GetSprite).
+            PickupPopup popup = PickupPopup.Create(newCharm.GetSprite());
+            // Starts watching for the room that holds the charm, so saves without it find it in the world.
+            new WorldPickup(newCharm, popup).Hook();
+            // Clears the charm for a new game, so a previously loaded save's flags don't carry over (ModHooks.NewGameHook).
+            ModHooks.NewGameHook += () => charm?.RestoreCharmState(new EasyCharmState());
             // Writes to ModLog.txt in the copy's save folder (Modding.Loggable.Log); seeing this line proves the mod loaded
             // and shows which charm id SFCore assigned.
             Log($"Initialized, charm id {newCharm.Id}");
-        }
-
-        // TEMPORARY: gives Champion's Shell if the current save doesn't have it yet. Remove with the world-pickup step
-        // (also remove the two hook lines in Initialize() that call it).
-        private void GiveCharmForTesting()
-        {
-            // Nothing to give before Initialize() has created the charm.
-            if (charm == null) return;
-            // Unlocks the inventory's Charms tab, which the game hides until PlayerData.hasCharm (first charm found) is true.
-            // Without this a new game has no Charms tab to equip the charm from.
-            PlayerData.instance.SetBool("hasCharm", true);
-            // Already owned (PlayerData.GetBool reaches EasyCharm's gotCharm_<id> answer): nothing to do. This keeps a
-            // loaded save from re-marking the charm as "new" every time.
-            if (PlayerData.instance.GetBool($"gotCharm_{charm.Id}")) return;
-            // Sets gotCharm_<id> and marks it new so the inventory shows the "new" dot (EasyCharm.GiveCharm).
-            charm.GiveCharm(true);
-            // Notes it in ModLog.txt so a test run shows whether the giver fired.
-            Log("Gave Champion's Shell (temporary test giver)");
         }
 
         // Called by the Modding API when a save loads, and with blank settings on scene changes (including before

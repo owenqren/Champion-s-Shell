@@ -2,17 +2,17 @@
 
 A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired by the Champion's Tunic in *Breath of the Wild*: while it is equipped, you can see your enemies' health.
 
-> Status: early development. The charm and its enemy health bars work in a test build; the second ability, finding the charm in the world and the Nailsmith upgrade are not built yet.
+> Status: early development. The charm, its enemy health bars and finding it in the world are built; the second ability and the Nailsmith upgrade are not.
 
 ## Features so far
 
-- **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now, and a test build hands it to you when you load a save.
-- **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. Bosses get a bigger bar, which is built to move to the top of the screen when the boss is out of view. Godhome support is built too. Neither of those two has been tested in game yet.
+- **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now. You find it floating on the path from the Dirtmouth bench to the well. Touching it collects it and shows a short popup.
+- **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. During a boss fight, one wide bar shows at the top of the screen instead, starting from your first hit.
+- **Not tested in game yet.** The boss bar at the top of the screen, and the bars in Godhome.
 
 ## Planned features
 
 - **A second ability.** Upgrading the charm adds a combat bonus. This is not decided yet; bonus damage against bosses and extra soul are the current ideas.
-- **Easy to find.** The base charm costs 1 notch and is found early in the world.
 - **Upgrades at the Nailsmith.** Pay geo and hand over a relic, such as a Wanderer's Journal, to upgrade the charm. Each upgrade makes the second ability stronger. Lemm is unchanged; you just keep the relic instead of selling it.
 
 ## Requirements
@@ -23,7 +23,7 @@ A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired 
 
 ## How it works
 
-The mod changes the game while it runs, using Modding API hooks and edits to PlayMaker FSMs. It does not replace any game files or scenes.
+The mod changes the game while it runs, using Modding API hooks. The Nailsmith upgrade will also edit PlayMaker FSMs. The mod itself does not replace any game files or scenes.
 
 ## License
 
@@ -33,7 +33,7 @@ Released under the [MIT License](LICENSE). This covers only this mod's own code 
 
 This section explains how Champion's Shell is put together. For line-by-line detail, read the comments in the code, since every line has one.
 
-The mod is four C# files in `ChampionsShell/`, plus one icon:
+The mod is six C# files in `ChampionsShell/`, plus one icon:
 
 | File | Job |
 |---|---|
@@ -41,6 +41,8 @@ The mod is four C# files in `ChampionsShell/`, plus one icon:
 | `ChampionsShellCharm.cs` | The charm's name, description, cost and icon. |
 | `EnemyTracker.cs` | Finds enemies and keeps track of their HP. |
 | `EnemyHealthBars.cs` | Draws the bars on screen. |
+| `WorldPickup.cs` | Places the charm in the world and collects it on touch. |
+| `PickupPopup.cs` | The short popup shown on collection. |
 | `Resources/ChampionsShell.png` | Placeholder charm icon, built into the DLL. |
 
 ### What it builds on
@@ -57,7 +59,7 @@ The mod is four C# files in `ChampionsShell/`, plus one icon:
    - creates the charm and applies any saved state to it
    - creates the `EnemyTracker` and hooks enemy spawning
    - creates the `EnemyHealthBars` object
-   - adds the temporary test giver
+   - creates the pickup popup and hooks room changes for the world pickup
 
 Everything else then runs from hooks and from Unity's once-per-frame `Update`.
 
@@ -98,18 +100,18 @@ Each frame, `Update()`:
 
 1. Calls `tracker.Refresh()`.
 2. Stops if the charm isn't equipped or the game is paused, hiding all bars.
-3. For each living enemy, finds the point above its head with `AboveOnScreen`, then checks `CanSee`.
+3. For each living enemy, adds bosses to the docked bar's totals. For normal enemies, it finds the point above the head with `AboveOnScreen`, then checks `CanSee`.
 4. Draws a bar for each enemy that passes both.
 5. Hides the bars of enemies that didn't.
-6. Shows the docked boss bar at the top of the screen if a boss being fought is out of view. That bar shows the combined HP of all bosses in the fight.
+6. Shows the docked boss bar at the top of the screen once a boss has lost HP. That bar shows the combined HP of all bosses in the fight.
 
-**Line of sight.** `CanSee` draws a line from the Knight to the enemy's middle and to its top. If terrain (layer mask `256`) blocks both, the enemy is out of sight. A bar stays for `SeenGraceTime` after that, so it doesn't flicker at corners. A boss being fought skips this check, so going behind a wall docks its bar instead of hiding it.
+**Line of sight.** `CanSee` draws a line from the Knight to the enemy's middle and to its top. If terrain (layer mask `256`) blocks both, the enemy is out of sight. A bar stays for `SeenGraceTime` after that, so it doesn't flicker at corners. Bosses skip this check, since they never get a bar above them.
 
 **Bar pieces.** Each bar (`BarWidget`) is a dark background with a pale fill inside it. An `Outline` effect marks the full length. The fill's width is set through `anchorMax.x`, which is current HP divided by max HP. The background is opaque because the outline is drawn behind it and would otherwise tint the whole bar.
 
 **Reusing bars.** `enemyBars` maps each enemy to its bar, so a bar follows the same enemy from frame to frame. Finished bars go to `spareBars` for reuse, so the mod isn't constantly creating and destroying UI objects.
 
-**Sliding.** `Place` moves each bar part of the way to its target every frame, so boss bars slide between the above-boss and docked positions instead of snapping.
+**Sliding.** `Place` moves each bar part of the way to its target every frame, so bars follow moving enemies smoothly.
 
 ### Things you can tune
 
@@ -117,7 +119,7 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 
 | Constant | File | Controls |
 |---|---|---|
-| `EnemyBarSize`, `BossBarSize`, `DockedBarSize` | `EnemyHealthBars.cs` | Bar sizes |
+| `EnemyBarSize`, `DockedBarSize` | `EnemyHealthBars.cs` | Bar sizes |
 | `GapAbove` | `EnemyHealthBars.cs` | Height of the bar above an enemy |
 | `DockedFromTop` | `EnemyHealthBars.cs` | Docked bar's distance from the top of the screen |
 | `OutlineWidth` | `EnemyHealthBars.cs` | Outline thickness |
@@ -126,10 +128,17 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 | `SeenGraceTime` | `EnemyHealthBars.cs` | How long a bar stays after losing sight of an enemy |
 | `ExtraBossNames` | `EnemyTracker.cs` | Bosses the automatic checks miss |
 | `IconPixelsPerUnit` | `ChampionsShellCharm.cs` | Icon size in the charm menu |
+| `TargetScene`, `TargetPosition` | `WorldPickup.cs` | Where the charm is found |
+| `PickupRadius`, `BobHeight`, `BobSpeed` | `WorldPickup.cs` | Pickup distance and bobbing |
+| `ShowTime`, `FadeTime` | `PickupPopup.cs` | How long the popup stays |
 
-### Temporary code
+### Finding the charm
 
-`GiveCharmForTesting` in `ChampionsShell.cs` gives you the charm on a new game or when a save loads. It also sets `hasCharm`, which unlocks the Charms tab. It gets removed when the charm can be found in the world, along with the two hook lines in `Initialize()` that call it.
+`WorldPickup` watches Unity's `activeSceneChanged`. When the player enters `TargetScene` (`Town`, which is Dirtmouth) and the save doesn't own the charm, it adds a floating object using the charm's icon at `TargetPosition`. Unity removes that object when the player leaves the room, and it's only added back while the charm is unowned.
+
+`CharmPickup` is the behaviour on that object. It bobs the icon and checks the Knight's distance every frame. It ignores room transitions, when the Knight's position is still from the old room. On touch, `WorldPickup.Collect` sets `hasCharm` (which unlocks the Charms tab), gives the charm and shows `PickupPopup`, a short icon and name that fades out.
+
+**Watch out:** the game has its own global class named `SceneManager`, which hides Unity's, so Unity's is written out in full. Code in `activeSceneChanged` must never throw, for the same reason as `OnLoadLocal`.
 
 ### Building
 

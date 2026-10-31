@@ -8,16 +8,13 @@ using UnityEngine.UI;
 // Same namespace as the rest of the mod (RootNamespace in ChampionsShell.csproj).
 namespace ChampionsShell
 {
-    // Draws a health bar above every enemy while Champion's Shell is equipped, plus a docked boss bar at the top of the
-    // screen when a boss being fought is out of view. Lives on its own GameObject that survives scene loads; created in
+    // Draws a health bar above every normal enemy while Champion's Shell is equipped, plus one docked boss bar at the top
+    // of the screen during a boss fight. Lives on its own GameObject that survives scene loads; created in
     // ChampionsShell.Initialize(). All positions are screen pixels because the canvas is a screen-space overlay.
     public class EnemyHealthBars : MonoBehaviour
     {
         // Normal enemy bar size in pixels at 1080p; scaled to the real screen height (see `scale` in Update).
         private static readonly Vector2 EnemyBarSize = new Vector2(90f, 8f);
-
-        // Boss bar size above the boss, in pixels at 1080p.
-        private static readonly Vector2 BossBarSize = new Vector2(220f, 14f);
 
         // Docked boss bar size at the top of the screen, in pixels at 1080p.
         private static readonly Vector2 DockedBarSize = new Vector2(640f, 14f);
@@ -29,7 +26,7 @@ namespace ChampionsShell
         // masks and soul vessel at top left and clear of the screen edge.
         private const float DockedFromTop = 70f;
 
-        // Seconds a bar takes to mostly reach a new position, so moves between above-boss and docked never snap.
+        // Seconds a bar takes to mostly reach a new position, so bars follow moving enemies smoothly.
         // Smaller is snappier; the slide uses an exponential ease (see Place), so this is a time constant, not a duration.
         private const float SlideTime = 0.07f;
 
@@ -87,7 +84,7 @@ namespace ChampionsShell
             public RectTransform Back = null!;
             // Fill rectangle (child of Back); its right edge (anchorMax.x) is the HP fraction.
             public RectTransform Fill = null!;
-            // Whether the bar was hidden last frame, so a newly shown bar starts at a chosen point instead of sliding in from wherever it was.
+            // Whether the bar was hidden last frame, so a newly shown bar starts at its target instead of sliding in from wherever it was.
             public bool WasHidden = true;
         }
 
@@ -139,10 +136,8 @@ namespace ChampionsShell
             int bossHp = 0;
             // Sum of max HP over bosses being fought, for the docked bar.
             int bossMax = 0;
-            // True when a boss being fought is out of view, so the docked bar shows.
+            // True when a boss is being fought, so the docked bar shows.
             bool dock = false;
-            // Last on-screen bar position of a boss that just went out of view, so the docked bar can slide up from it.
-            Vector2? dockFrom = null;
             // Places the bars; when not active nothing is placed, so the clean-up below hides every bar.
             if (active)
             {
@@ -154,36 +149,33 @@ namespace ChampionsShell
                 {
                     // Skips enemies with no HP left or whose object is inactive.
                     if (!EnemyTracker.IsAlive(enemy)) continue;
-                    // Bar size for this enemy: bigger for bosses.
-                    Vector2 size = (enemy.IsBoss ? BossBarSize : EnemyBarSize) * scale;
-                    // Screen point for the bar's centre above the enemy, or null if the enemy is out of view.
-                    Vector2? above = AboveOnScreen(enemy, cam, size.y, scale);
-                    // Treats an on-screen enemy the Knight can't see (behind terrain) as out of view, so it gets no bar.
-                    if (above != null && !CanSee(enemy)) above = null;
-                    // Bosses being fought add to the docked bar's totals, whether or not they're on screen.
-                    if (enemy.IsBoss && enemy.InFight) { bossHp += enemy.Health.hp; bossMax += enemy.MaxHp; }
-                    // Out of view: no bar above it.
-                    if (above == null)
+                    // Bosses never get a bar above them; they use the docked bar instead.
+                    if (enemy.IsBoss)
                     {
-                        // A boss being fought out of view turns on the docked bar.
-                        if (enemy.IsBoss && enemy.InFight)
+                        // A boss only counts once it has lost HP (TrackedEnemy.InFight), so the bar never reveals a boss
+                        // before its fight starts.
+                        if (enemy.InFight)
                         {
+                            // Adds its HP to the docked bar's totals, whether or not it's on screen.
+                            bossHp += enemy.Health.hp;
+                            // Adds its max HP too.
+                            bossMax += enemy.MaxHp;
                             // Shows the docked bar this frame.
                             dock = true;
-                            // If the boss's own bar was showing, the docked bar starts from there and slides up
-                            // (Back.position is in screen pixels on an overlay canvas).
-                            if (enemyBars.TryGetValue(enemy, out BarWidget old) && !old.WasHidden) dockFrom = old.Back.position;
                         }
-                        // Nothing to draw above this enemy; its old bar (if any) is put away by the clean-up below.
+                        // Nothing to draw above a boss.
                         continue;
                     }
+                    // Bar size for a normal enemy.
+                    Vector2 size = EnemyBarSize * scale;
+                    // Screen point for the bar's centre above the enemy, or null if the enemy is out of view.
+                    Vector2? above = AboveOnScreen(enemy, cam, size.y, scale);
+                    // No bar if it's out of view, or on screen but behind terrain; any old bar is put away by the clean-up below.
+                    if (above == null || !CanSee(enemy)) continue;
                     // Gets this enemy's bar, or a spare one.
                     BarWidget bar = BarFor(enemy);
-                    // A boss coming back into view starts its bar from the docked bar's spot and slides down;
-                    // everything else starts exactly where it will be drawn.
-                    Vector2 from = enemy.IsBoss && !dockedBar.WasHidden ? (Vector2)dockedBar.Back.position : above.Value;
                     // Draws the bar above the enemy with its HP fraction.
-                    Place(bar, above.Value, size, Fraction(enemy.Health.hp, enemy.MaxHp), from);
+                    Place(bar, above.Value, size, Fraction(enemy.Health.hp, enemy.MaxHp));
                     // Remembers it was shown so it isn't put away below.
                     shownThisFrame.Add(enemy);
                 }
@@ -194,13 +186,13 @@ namespace ChampionsShell
             foreach (KeyValuePair<TrackedEnemy, BarWidget> pair in enemyBars) if (!shownThisFrame.Contains(pair.Key)) toRemove.Add(pair.Key);
             // Hides each one and returns it to the spares.
             foreach (TrackedEnemy enemy in toRemove) { Hide(enemyBars[enemy]); spareBars.Push(enemyBars[enemy]); enemyBars.Remove(enemy); }
-            // Docked bar at the top centre (clear of the masks and soul at top left) when a fought boss is out of view.
+            // Docked bar at the top centre (clear of the masks and soul at top left) during a boss fight.
             if (dock)
             {
                 // Top centre of the screen, DockedFromTop below the edge. Screen y is 0 at the bottom, hence Height - offset.
                 Vector2 docked = new Vector2(Screen.width / 2f, Screen.height - DockedFromTop * scale);
-                // Draws the combined boss HP, sliding up from the boss's last bar position if there was one.
-                Place(dockedBar, docked, DockedBarSize * scale, Fraction(bossHp, bossMax), dockFrom ?? docked);
+                // Draws the combined boss HP.
+                Place(dockedBar, docked, DockedBarSize * scale, Fraction(bossHp, bossMax));
             }
             // Otherwise hides the docked bar.
             else Hide(dockedBar);
@@ -238,8 +230,6 @@ namespace ChampionsShell
         // Whether the Knight has line of sight to an enemy, allowing SeenGraceTime after losing it.
         private static bool CanSee(TrackedEnemy enemy)
         {
-            // A boss being fought always passes, so going behind terrain docks its bar instead of hiding it.
-            if (enemy.IsBoss && enemy.InFight) return true;
             // The Knight (HeroController.instance), which is null during some scene transitions.
             HeroController hero = HeroController.instance;
             // No Knight means nothing to see from.
@@ -272,21 +262,20 @@ namespace ChampionsShell
             return bar;
         }
 
-        // Moves, sizes and fills one bar, sliding it toward its target; a bar that was hidden starts at `from`.
-        private static void Place(BarWidget widget, Vector2 target, Vector2 size, float fraction, Vector2 from)
+        // Moves, sizes and fills one bar, sliding it toward its target; a bar that was hidden starts at the target.
+        private static void Place(BarWidget widget, Vector2 target, Vector2 size, float fraction)
         {
             // Shows the bar if it was hidden.
             widget.Back.gameObject.SetActive(true);
             // Fraction of the way to move this frame; unscaled time so slow-motion hits don't slow the slide.
             // 1 - e^(-dt / SlideTime) is frame-rate independent: the same distance is covered per second at any FPS.
             float t = 1f - Mathf.Exp(-Time.unscaledDeltaTime / SlideTime);
-            // Starting point: `from` if the bar just appeared, otherwise where it is now.
-            Vector2 start = widget.WasHidden ? from : (Vector2)widget.Back.position;
+            // Starting point: the target if the bar just appeared, otherwise where it is now.
+            Vector2 start = widget.WasHidden ? target : (Vector2)widget.Back.position;
             // Moves part of the way to the target (screen pixels on an overlay canvas).
             widget.Back.position = Vector2.Lerp(start, target, t);
-            // Sets the size; a just-shown bar jumps to it, otherwise it eases so bars resize smoothly
-            // (for example a boss bar growing into the docked bar).
-            widget.Back.sizeDelta = widget.WasHidden ? size : Vector2.Lerp(widget.Back.sizeDelta, size, t);
+            // Sets the size; a reused bar may have had a different one, and the screen size can change.
+            widget.Back.sizeDelta = size;
             // Fill's right edge at the HP fraction of the background's width (the fill is anchored to the background,
             // so changing anchorMax.x resizes it without touching offsets).
             widget.Fill.anchorMax = new Vector2(fraction, 1f);
@@ -299,7 +288,7 @@ namespace ChampionsShell
         {
             // Hides the bar's object (the fill child goes with it).
             widget.Back.gameObject.SetActive(false);
-            // Marks it hidden, so Place() snaps it to its start point instead of sliding from a stale position.
+            // Marks it hidden, so Place() snaps it to its target instead of sliding from a stale position.
             widget.WasHidden = true;
         }
 

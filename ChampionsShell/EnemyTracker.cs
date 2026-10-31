@@ -20,11 +20,11 @@ namespace ChampionsShell
         // so a boss that heals past its starting HP shows a full bar instead of one wider than the background.
         public int MaxHp;
 
-        // True for bosses: they get a bigger bar that docks at the top of the screen when they're out of view.
+        // True for bosses: they get no bar above them, only the docked bar at the top of the screen during a fight.
         public bool IsBoss;
 
-        // True once the enemy has lost HP. Bosses only dock to the top of the screen after this, so a boss that hasn't
-        // been fought yet never gets a bar while it's out of view. Never reset to false (a healed boss is still in a fight).
+        // True once the enemy has lost HP. The docked boss bar only shows after this, so a boss that hasn't been fought
+        // yet is never revealed. Never reset to false (a healed boss is still in a fight).
         public bool InFight;
 
         // Sprite renderer (tk2d sprites draw through a MeshRenderer); its bounds give the "top of the enemy" for the bar.
