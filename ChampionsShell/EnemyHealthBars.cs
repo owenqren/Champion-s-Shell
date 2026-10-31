@@ -33,11 +33,24 @@ namespace ChampionsShell
         // Smaller is snappier; the slide uses an exponential ease (see Place), so this is a time constant, not a duration.
         private const float SlideTime = 0.07f;
 
+        // Physics layer mask for solid terrain (layer 8, PhysLayers.TERRAIN); HeroController's own raycasts use the same 256.
+        private const int TerrainMask = 256;
+
+        // Seconds a bar stays after its enemy goes out of sight, so bars don't flicker at corners.
+        private const float SeenGraceTime = 0.5f;
+
         // Border around the fill, in pixels at 1080p.
         private const float Border = 2f;
 
-        // Background colour: dark, slightly see-through (alpha 0.8) so the empty part of the bar reads as "missing HP".
-        private static readonly Color BackColor = new Color(0.05f, 0.05f, 0.07f, 0.8f);
+        // Background colour: dark and opaque. The Outline effect draws behind this image, so a see-through background
+        // would let the outline tint the whole bar.
+        private static readonly Color BackColor = new Color(0.05f, 0.05f, 0.07f, 1f);
+
+        // Outline colour: same pale shell white as the fill, marking the bar's full length against any background.
+        private static readonly Color OutlineColor = new Color(0.93f, 0.9f, 0.83f, 1f);
+
+        // Outline thickness in pixels at 1080p.
+        private const float OutlineWidth = 1.5f;
 
         // Fill colour: pale shell white.
         private static readonly Color FillColor = new Color(0.93f, 0.9f, 0.83f, 1f);
@@ -145,6 +158,8 @@ namespace ChampionsShell
                     Vector2 size = (enemy.IsBoss ? BossBarSize : EnemyBarSize) * scale;
                     // Screen point for the bar's centre above the enemy, or null if the enemy is out of view.
                     Vector2? above = AboveOnScreen(enemy, cam, size.y, scale);
+                    // Treats an on-screen enemy the Knight can't see (behind terrain) as out of view, so it gets no bar.
+                    if (above != null && !CanSee(enemy)) above = null;
                     // Bosses being fought add to the docked bar's totals, whether or not they're on screen.
                     if (enemy.IsBoss && enemy.InFight) { bossHp += enemy.Health.hp; bossMax += enemy.MaxHp; }
                     // Out of view: no bar above it.
@@ -202,11 +217,8 @@ namespace ChampionsShell
         // for the bar below the top edge.
         private static Vector2? AboveOnScreen(TrackedEnemy enemy, Camera cam, float barHeight, float scale)
         {
-            // Uses the renderer's bounds, or the hitbox's if there's no renderer, or the object's position as a last resort
-            // (a zero-size box, so the bar sits at the object's origin).
-            Bounds bounds = enemy.Renderer != null ? enemy.Renderer.bounds
-                : enemy.Collider != null ? enemy.Collider.bounds
-                : new Bounds(enemy.Health.transform.position, Vector3.zero);
+            // The enemy's box on screen, used for its top edge.
+            Bounds bounds = BoundsOf(enemy);
             // Projects the top centre of those bounds to screen pixels (z is distance in front of the camera).
             Vector3 top = cam.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.max.y, bounds.center.z));
             // Bar centre: the gap plus half the bar height above the top (the bar is positioned by its centre).
@@ -215,6 +227,36 @@ namespace ChampionsShell
             if (top.z < 0 || top.x < 0 || top.x > Screen.width || top.y < 0 || centre.y + barHeight / 2f > Screen.height) return null;
             // The bar's centre on screen.
             return centre;
+        }
+
+        // Uses the renderer's bounds, or the hitbox's if there's no renderer, or the object's position as a last resort
+        // (a zero-size box, so the bar sits at the object's origin).
+        private static Bounds BoundsOf(TrackedEnemy enemy) => enemy.Renderer != null ? enemy.Renderer.bounds
+            : enemy.Collider != null ? enemy.Collider.bounds
+            : new Bounds(enemy.Health.transform.position, Vector3.zero);
+
+        // Whether the Knight has line of sight to an enemy, allowing SeenGraceTime after losing it.
+        private static bool CanSee(TrackedEnemy enemy)
+        {
+            // A boss being fought always passes, so going behind terrain docks its bar instead of hiding it.
+            if (enemy.IsBoss && enemy.InFight) return true;
+            // The Knight (HeroController.instance), which is null during some scene transitions.
+            HeroController hero = HeroController.instance;
+            // No Knight means nothing to see from.
+            if (hero == null) return false;
+            // Start of the sight line: the Knight's position.
+            Vector2 eye = hero.transform.position;
+            // The enemy's box, for the two points below.
+            Bounds bounds = BoundsOf(enemy);
+            // Checks the enemy's middle and top, since either can poke out from behind a ledge. Physics2D.Linecast hits
+            // only TerrainMask; a default (no hit) result converts to false, meaning the line is clear.
+            if (!Physics2D.Linecast(eye, bounds.center, TerrainMask) || !Physics2D.Linecast(eye, new Vector2(bounds.center.x, bounds.max.y), TerrainMask))
+            {
+                // Records that the Knight can see it now (Unity Time.time, in seconds).
+                enemy.LastSeenTime = Time.time;
+            }
+            // Visible if seen within the grace time, which also covers this frame's clear line.
+            return Time.time - enemy.LastSeenTime < SeenGraceTime;
         }
 
         // Returns the bar already used for an enemy, or takes a spare (or new) one for it.
@@ -270,6 +312,12 @@ namespace ChampionsShell
             back.transform.SetParent(canvas.transform, false);
             // Background colour (an Image with no sprite draws a solid rectangle).
             back.GetComponent<Image>().color = BackColor;
+            // Adds the outline effect (UnityEngine.UI.Outline), which redraws the background's shape offset in four directions.
+            Outline outline = back.AddComponent<Outline>();
+            // Outline colour.
+            outline.effectColor = OutlineColor;
+            // Outline thickness scaled from 1080p; x and y are the offsets of those four copies.
+            outline.effectDistance = Vector2.one * OutlineWidth * (Screen.height / 1080f);
             // Fill object inside the background.
             GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             // Puts the fill inside the background so it moves with it.

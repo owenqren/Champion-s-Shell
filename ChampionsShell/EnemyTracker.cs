@@ -33,6 +33,10 @@ namespace ChampionsShell
 
         // Fallback for enemies with no renderer on the same object: the hitbox bounds.
         public Collider2D? Collider;
+
+        // Time.time when the Knight last had a clear line to this enemy; EnemyHealthBars uses it so bars don't flicker
+        // at corners. Starts far in the past so an enemy that was never seen has no bar.
+        public float LastSeenTime = -100f;
     }
 
     // Finds enemies as they spawn and keeps their HP up to date for EnemyHealthBars.
