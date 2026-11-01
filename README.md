@@ -2,7 +2,7 @@
 
 A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired by the Champion's Tunic in *Breath of the Wild*: while it is equipped, you can see your enemies' health.
 
-> Status: early development. The charm, its enemy health bars, finding it in the world, its second ability and the Nailsmith upgrade are built. The upgrade isn't tested in game yet.
+> Status: early development. The charm, its enemy health bars, finding it in the world, its second ability and the Nailsmith upgrade are built. The upgrade works in game; the anvil fallback isn't tested yet.
 
 ## Features so far
 

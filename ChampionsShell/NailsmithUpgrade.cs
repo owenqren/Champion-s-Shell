@@ -136,11 +136,22 @@ namespace ChampionsShell
             atAnvil = false;
             // No yes/no box is open.
             buying = false;
-            // The dialogue box object, taken from the game's own conversation action in "Not Enough Geo".
-            GameObject speech = fsm.Fsm.GetOwnerDefaultTarget(fsm.GetFirstActionOfType<CallMethodProper>("Not Enough Geo").gameObject);
 
+            // All the new states are created before any is linked, because FsmUtil.AddTransition stores the target state
+            // when it's called, and a link to a state that doesn't exist yet goes nowhere and hangs the talk.
             // Choice at the start of the talk: at the anvil, skip his greetings.
             FsmState route = fsm.AddState(RouteState);
+            // Choice after the greeting: the charm offer if it's affordable, otherwise the normal nail offer.
+            FsmState offerCheck = fsm.AddState(OfferCheckState);
+            // Says the offer and sets up the game's yes/no box.
+            FsmState offer = fsm.AddState(OfferState);
+            // Waits for the last line, then ends the talk through the game's own state.
+            FsmState farewell = fsm.AddState(FarewellState);
+            // The empty anvil: the game's Idle state sends LEFT when PlayerData.nailsmithCliff is set, and normally deactivates him.
+            FsmState anvilCheck = fsm.AddState(AnvilCheckState);
+            // Listens for the player talking, as the game's Idle does (npc_control sends CONVO START).
+            FsmState anvilIdle = fsm.AddState(AnvilIdleState);
+
             // Sends the talk to the offer or to the game's Met? state (depends on atAnvil, set in the anvil check below).
             route.AddMethod(() => fsm.SendEvent(atAnvil ? ToOffer : ToVanilla));
             // Anvil route.
@@ -150,8 +161,6 @@ namespace ChampionsShell
             // Puts the choice between the box opening and the greeting (the game's Box Up state).
             fsm.ChangeTransition("Box Up", "FINISHED", RouteState);
 
-            // Choice after the greeting: the charm offer if it's affordable, otherwise the normal nail offer.
-            FsmState offerCheck = fsm.AddState(OfferCheckState);
             // Sends the talk on (depends on CanUpgrade).
             offerCheck.AddMethod(() => fsm.SendEvent(CanUpgrade() ? ToOffer : ToVanilla));
             // Affordable.
@@ -161,10 +170,8 @@ namespace ChampionsShell
             // All three greetings normally lead to Offer Type; they now go through the check first.
             foreach (string greeting in new[] { "Greet", "Regreet", "Meet 3" }) fsm.ChangeTransition(greeting, "CONVO_FINISH", OfferCheckState);
 
-            // Says the offer and sets up the game's yes/no box.
-            FsmState offer = fsm.AddState(OfferState);
             // Depends on the FSM variables Send Text reads ("Prompt Convo", "Upgrade Cost") and on the dialogue box.
-            offer.AddMethod(() => StartOffer(fsm, speech));
+            offer.AddMethod(() => StartOffer(fsm));
             // When the line ends, the game's own states close the box and open the yes/no box.
             offer.AddTransition("CONVO_FINISH", "Dial Box Down");
 
@@ -174,22 +181,20 @@ namespace ChampionsShell
             fsm.AddTransition("Price Check", ToPrompt, "Send Text");
 
             // After Yes, the game's Accept state would start the nail cutscene; the charm's upgrade runs instead.
-            fsm.InsertMethod("Accept", 0, () => { if (buying) { Upgrade(); Farewell(fsm, speech, atAnvil ? AnvilDoneKey : ThanksKey); } });
+            fsm.InsertMethod("Accept", 0, () => { if (buying) { Upgrade(); Farewell(fsm, atAnvil ? AnvilDoneKey : ThanksKey); } });
             // Target for the end of the purchase.
             fsm.AddTransition("Accept", ToFarewell, FarewellState);
 
             // After No, the game's Enough Geo? state would say a nail line; the charm carries on instead.
-            fsm.InsertMethod("Enough Geo?", 0, () => { if (buying) Declined(fsm, speech); });
+            fsm.InsertMethod("Enough Geo?", 0, () => { if (buying) Declined(fsm); });
             // Declining at the Nailsmith continues to the nail offer.
             fsm.AddTransition("Enough Geo?", ToVanilla, "Offer Type");
             // Declining at the anvil ends the talk.
             fsm.AddTransition("Enough Geo?", ToFarewell, FarewellState);
 
-            // Waits for the last line, then ends the talk through the game's own state.
-            fsm.AddState(FarewellState).AddTransition("CONVO_FINISH", "Talk Finish 2");
+            // Ends the talk once the last line finishes.
+            farewell.AddTransition("CONVO_FINISH", "Talk Finish 2");
 
-            // The empty anvil: the game's Idle state sends LEFT when PlayerData.nailsmithCliff is set, and normally deactivates him.
-            FsmState anvilCheck = fsm.AddState(AnvilCheckState);
             // Stays as the anvil if an upgrade is affordable, otherwise leaves as normal (depends on CanUpgrade).
             anvilCheck.AddMethod(() => CheckAnvil(fsm));
             // Stays.
@@ -198,8 +203,8 @@ namespace ChampionsShell
             anvilCheck.AddTransition(ToVanilla, "Leave");
             // Puts the check before the game's Leave state.
             fsm.ChangeTransition("Idle", "LEFT", AnvilCheckState);
-            // Listens for the player talking, as the game's Idle does (npc_control sends CONVO START).
-            fsm.AddState(AnvilIdleState).AddTransition("CONVO START", "Hero Look");
+            // Starts the talk from the empty anvil.
+            anvilIdle.AddTransition("CONVO START", "Hero Look");
         }
 
         // Whether this save can buy the next upgrade right now.
@@ -214,7 +219,7 @@ namespace ChampionsShell
         }
 
         // Says the offer line and sets the price for the yes/no box.
-        private void StartOffer(PlayMakerFSM fsm, GameObject speech)
+        private void StartOffer(PlayMakerFSM fsm)
         {
             // The shared states below now belong to the charm.
             buying = true;
@@ -223,7 +228,7 @@ namespace ChampionsShell
             // Price for the yes/no box; Send Text copies it to the box's Toll Cost, and the box takes that geo on Yes.
             fsm.FsmVariables.GetFsmInt("Upgrade Cost").Value = GeoByTier[charm.Tier];
             // Starts the line; the DialogueBox sends CONVO_FINISH to the FSM when it ends (DialogueManager's page control).
-            speech.GetComponent<DialogueBox>().StartConversation(atAnvil ? AnvilOfferKey : OfferKey, SpeechSheet);
+            Say(fsm, atAnvil ? AnvilOfferKey : OfferKey);
         }
 
         // Spends the relic and raises the tier. The yes/no box has already taken the geo.
@@ -238,10 +243,10 @@ namespace ChampionsShell
         }
 
         // Moves on after No: to the nail offer at the Nailsmith, or to a last line at the anvil.
-        private void Declined(PlayMakerFSM fsm, GameObject speech)
+        private void Declined(PlayMakerFSM fsm)
         {
             // Ends the talk at the anvil, which has no nail offer.
-            if (atAnvil) { Farewell(fsm, speech, AnvilDeclineKey); return; }
+            if (atAnvil) { Farewell(fsm, AnvilDeclineKey); return; }
             // The yes/no box is finished with.
             buying = false;
             // Carries on to the nail offer.
@@ -249,14 +254,24 @@ namespace ChampionsShell
         }
 
         // Says a last line and moves to the state that waits for it to end.
-        private void Farewell(PlayMakerFSM fsm, GameObject speech, string key)
+        private void Farewell(PlayMakerFSM fsm, string key)
         {
             // The yes/no box is finished with.
             buying = false;
             // Moves first, so the state is waiting for CONVO_FINISH.
             fsm.SendEvent(ToFarewell);
             // Starts the line.
-            speech.GetComponent<DialogueBox>().StartConversation(key, SpeechSheet);
+            Say(fsm, key);
+        }
+
+        // Starts a spoken line in the game's dialogue box.
+        private void Say(PlayMakerFSM fsm, string key)
+        {
+            // Finds the box as the game's own conversation action in "Not Enough Geo" does. It's read here, during the talk,
+            // because the FSM's reference may not be set yet when the room loads.
+            GameObject box = fsm.Fsm.GetOwnerDefaultTarget(fsm.GetFirstActionOfType<CallMethodProper>("Not Enough Geo").gameObject);
+            // Shows the line; OnLanguageGet supplies the text.
+            box.GetComponent<DialogueBox>().StartConversation(key, SpeechSheet);
         }
 
         // Runs each time the game's Idle state finds the Nailsmith has left.
