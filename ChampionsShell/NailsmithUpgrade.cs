@@ -28,6 +28,15 @@ namespace ChampionsShell
         // His FSM that plays the hammer sound while he works; turned off at the empty anvil.
         private const string HammerSoundFsm = "Anvil Tink";
 
+        // His FSM that shows the talk prompt.
+        private const string NpcFsm = "npc_control";
+
+        // Prompt text at the empty anvil; the game turns this into its INSPECT language key.
+        private const string AnvilPrompt = "Inspect";
+
+        // Children of the Nailsmith object that belong to him, not to the empty room (names from level16).
+        private static readonly string[] AnvilOffChildren = { "Fire", "Fire Audio", "Dream Dialogue" };
+
         // New states added to Conversation Control.
         private const string RouteState = "Charm Route";
 
@@ -284,7 +293,15 @@ namespace ChampionsShell
             // Hides his sprite, since tk2d sprites draw through a MeshRenderer on the object.
             fsm.GetComponent<MeshRenderer>().enabled = false;
             // Silences the hammer sound, which is timed to his animation (FSM Anvil Tink, on the same object).
-            PlayMakerFSM.FindFsmOnGameObject(fsm.gameObject, HammerSoundFsm).enabled = false;
+            PlayMakerFSM hammer = PlayMakerFSM.FindFsmOnGameObject(fsm.gameObject, HammerSoundFsm);
+            // Skipped if the FSM isn't there, since this runs inside the game's room setup.
+            if (hammer != null) hammer.enabled = false;
+            // Turns off what would have gone with him: Leave deactivates his whole object, including these children.
+            foreach (string child in AnvilOffChildren) fsm.transform.Find(child)?.gameObject.SetActive(false);
+            // His prompt reads Listen; the anvil's reads Inspect (FSM npc_control on the same object, its string Prompt Name).
+            FsmString? prompt = PlayMakerFSM.FindFsmOnGameObject(fsm.gameObject, NpcFsm)?.FsmVariables.FindFsmString("Prompt Name");
+            // Skipped if the variable isn't there, since this runs inside the game's room setup.
+            if (prompt != null) prompt.Value = AnvilPrompt;
             // Waits for the player.
             fsm.SendEvent(ToAnvil);
         }

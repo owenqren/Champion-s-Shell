@@ -2,7 +2,7 @@
 
 A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired by the Champion's Tunic in *Breath of the Wild*: while it is equipped, you can see your enemies' health.
 
-> Status: early development. The charm, its enemy health bars, finding it in the world, its second ability and the Nailsmith upgrade are built. The upgrade works in game; the anvil fallback isn't tested yet.
+> Status: early development. The charm, its enemy health bars, finding it in the world, its second ability and the Nailsmith upgrade are built. The upgrade works in game, including at the anvil.
 
 ## Features so far
 
@@ -143,7 +143,7 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 
 If it can, he makes the offer and the talk runs through the game's own yes/no states, with the `buying` flag sending them to the charm's steps instead of the nail's. The yes/no box takes the geo itself. On Yes, `Upgrade()` spends the relic, raises the tier and saves. On No, the talk carries on to his nail offer, so the charm never blocks nail upgrades.
 
-The game's `Idle` state makes him leave when `PlayerData.nailsmithCliff` is set. A new state runs first: if an upgrade is affordable, his object stays with its sprite and hammer sound off, and talking to it opens the same offer as the anvil, without his greetings.
+The game's `Idle` state makes him leave when `PlayerData.nailsmithCliff` is set. A new state runs first: if an upgrade is affordable, his object stays with its sprite, hammer sound, fire and dream dialogue off and an Inspect prompt, and using it opens the same offer as the anvil, without his greetings. Once nothing is affordable, he leaves as normal.
 
 ### Finding the charm
 
