@@ -24,6 +24,9 @@ namespace ChampionsShell
         // Unity's default for sprites is 100, which keeps the PNG's pixel size equal to its size in the menu.
         private const float IconPixelsPerUnit = 100f;
 
+        // Highest upgrade tier, shown in the description; matches the three entries in NailsmithUpgrade.RelicByTier.
+        private const int MaxTier = 3;
+
         // Upgrade tier: 0 is the base charm. Restored and saved by ChampionsShell (LocalSettings.UpgradeTier), read by
         // FinishingBlow and GetDescription.
         public int Tier { get; set; }
@@ -37,7 +40,9 @@ namespace ChampionsShell
         protected override string GetDescription() =>
             "Shell worn by a champion of a kingdom long fallen.\n\nReveals the remaining strength of foes."
             // Adds the Finishing Blow line once the charm has been upgraded.
-            + (Tier > 0 ? " The bearer's nail strikes harder against foes near defeat." : "");
+            + (Tier > 0 ? " The bearer's nail strikes harder against foes near defeat." : "")
+            // Shows the upgrade level as its own paragraph; Tier is raised by NailsmithUpgrade.Upgrade.
+            + $"\n\nLevel {Tier} of {MaxTier}";
 
         // Notch cost, asked for through charmCost_<id>; Owen's decision: always 1 notch (upgrades only strengthen the
         // second ability, they never change the cost).

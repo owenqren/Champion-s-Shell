@@ -8,7 +8,7 @@ A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired 
 
 - **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now. You find it floating on the path from the Dirtmouth bench to the well. Touching it collects it and shows a short popup.
 - **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. During a boss fight, one wide bar shows at the top of the screen instead, starting from your first hit.
-- **Finishing Blow.** Once the charm is upgraded, your nail hits harder against enemies that are nearly dead. Each upgrade makes the bonus start earlier in the fight and adds more damage: below 25% enemy health for +20% damage, then below 32% for +28%, then below 40% for +35%.
+- **Finishing Blow.** Once the charm is upgraded, your nail hits harder against enemies that are nearly dead. Each upgrade makes the bonus start earlier in the fight and adds more damage: below 25% enemy health for +20% damage, then below 32% for +28%, then below 40% for +35%. The charm's description shows its level, from Level 0 of 3 to Level 3 of 3.
 - **Upgrades at the Nailsmith.** When you can afford an upgrade, the Nailsmith offers it before his nail offer: a Wanderer's Journal and 300 geo, then a Hallownest Seal and 800 geo, then a King's Idol and 2000 geo. Lemm is unchanged. Once the Nailsmith has left for good, you can still upgrade at his anvil.
 - **Not tested in game yet.** The bars in Godhome, and the top boss bar on bosses other than False Knight.
 
