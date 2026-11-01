@@ -2,18 +2,15 @@
 
 A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired by the Champion's Tunic in *Breath of the Wild*: while it is equipped, you can see your enemies' health.
 
-> Status: early development. The charm, its enemy health bars, finding it in the world and its second ability are built; the Nailsmith upgrade is not.
+> Status: early development. The charm, its enemy health bars, finding it in the world, its second ability and the Nailsmith upgrade are built. The upgrade isn't tested in game yet.
 
 ## Features so far
 
 - **The charm.** Champion's Shell costs 1 notch. It has a placeholder icon for now. You find it floating on the path from the Dirtmouth bench to the well. Touching it collects it and shows a short popup.
 - **Enemy health bars.** While the charm is equipped, every enemy you can see shows its remaining HP in a small outlined bar above it. Enemies behind terrain get no bar. During a boss fight, one wide bar shows at the top of the screen instead, starting from your first hit.
-- **Finishing Blow.** Once the charm is upgraded, your nail does bonus damage to enemies low on health. Each of the three tiers raises both the health limit (25%, 32%, 40%) and the bonus (+20%, +28%, +35%). Upgrades can't be earned yet.
+- **Finishing Blow.** Once the charm is upgraded, your nail hits harder against enemies that are nearly dead. Each upgrade makes the bonus start earlier in the fight and adds more damage: below 25% enemy health for +20% damage, then below 32% for +28%, then below 40% for +35%.
+- **Upgrades at the Nailsmith.** When you can afford an upgrade, the Nailsmith offers it before his nail offer: a Wanderer's Journal and 300 geo, then a Hallownest Seal and 800 geo, then a King's Idol and 2000 geo. Lemm is unchanged. Once the Nailsmith has left for good, you can still upgrade at his anvil.
 - **Not tested in game yet.** The bars in Godhome, and the top boss bar on bosses other than False Knight.
-
-## Planned features
-
-- **Upgrades at the Nailsmith.** Pay geo and hand over a relic, such as a Wanderer's Journal, to upgrade the charm. Each upgrade makes Finishing Blow stronger. Lemm is unchanged; you just keep the relic instead of selling it.
 
 ## Requirements
 
@@ -23,7 +20,7 @@ A Hollow Knight mod that adds a new charm, **Champion's Shell**. It is inspired 
 
 ## How it works
 
-The mod changes the game while it runs, using Modding API hooks. The Nailsmith upgrade will also edit PlayMaker FSMs. The mod itself does not replace any game files or scenes.
+The mod changes the game while it runs, using Modding API hooks. The Nailsmith upgrade also edits a PlayMaker FSM. The mod itself does not replace any game files or scenes.
 
 ## License
 
@@ -33,7 +30,7 @@ Released under the [MIT License](LICENSE). This covers only this mod's own code 
 
 This section explains how Champion's Shell is put together. For line-by-line detail, read the comments in the code, since every line has one.
 
-The mod is seven C# files in `ChampionsShell/`, plus one icon:
+The mod is eight C# files in `ChampionsShell/`, plus one icon:
 
 | File | Job |
 |---|---|
@@ -42,6 +39,7 @@ The mod is seven C# files in `ChampionsShell/`, plus one icon:
 | `EnemyTracker.cs` | Finds enemies and keeps track of their HP. |
 | `EnemyHealthBars.cs` | Draws the bars on screen. |
 | `FinishingBlow.cs` | Bonus nail damage to low-health enemies, by upgrade tier. |
+| `NailsmithUpgrade.cs` | Charm upgrades at the Nailsmith and his anvil. |
 | `WorldPickup.cs` | Places the charm in the world and collects it on touch. |
 | `PickupPopup.cs` | The short popup shown on collection. |
 | `Resources/ChampionsShell.png` | Placeholder charm icon, built into the DLL. |
@@ -130,6 +128,7 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 | `ExtraBossNames` | `EnemyTracker.cs` | Bosses the automatic checks miss |
 | `IconPixelsPerUnit` | `ChampionsShellCharm.cs` | Icon size in the charm menu |
 | `LowHealthByTier`, `DamageByTier` | `FinishingBlow.cs` | When the bonus applies and how strong it is |
+| `RelicByTier`, `GeoByTier` | `NailsmithUpgrade.cs` | What each upgrade costs |
 | `TargetScene`, `TargetPosition` | `WorldPickup.cs` | Where the charm is found |
 | `PickupRadius`, `BobHeight`, `BobSpeed` | `WorldPickup.cs` | Pickup distance and bobbing |
 | `ShowTime`, `FadeTime` | `PickupPopup.cs` | How long the popup stays |
@@ -137,6 +136,14 @@ All of these are constants at the top of their file, and sizes are in pixels at 
 ### Finishing Blow
 
 `FinishingBlow` hooks `HealthManager.TakeDamage`. If the charm is equipped, its tier is above 0, the hit is `AttackTypes.Nail` and the enemy is at or below its tier's `LowHealthByTier` fraction of its tracked `MaxHp`, it raises `hitInstance.Multiplier`. The game applies that multiplier when it works out damage, so this stacks with other charms. The hook always calls the original method, or the hit would be lost. The tier is `ChampionsShellCharm.Tier`, saved as `LocalSettings.UpgradeTier`.
+
+### The Nailsmith upgrade
+
+`NailsmithUpgrade` hooks `PlayMakerFSM.OnEnable` and edits the Nailsmith's `Conversation Control` FSM. After his greeting, a new state checks `CanUpgrade()`: the save owns the charm, the tier is below 3, and it has the relic and the geo. If not, the game carries on as normal.
+
+If it can, he makes the offer and the talk runs through the game's own yes/no states, with the `buying` flag sending them to the charm's steps instead of the nail's. The yes/no box takes the geo itself. On Yes, `Upgrade()` spends the relic, raises the tier and saves. On No, the talk carries on to his nail offer, so the charm never blocks nail upgrades.
+
+The game's `Idle` state makes him leave when `PlayerData.nailsmithCliff` is set. A new state runs first: if an upgrade is affordable, his object stays with its sprite and hammer sound off, and talking to it opens the same offer as the anvil, without his greetings.
 
 ### Finding the charm
 

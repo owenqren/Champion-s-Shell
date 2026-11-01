@@ -77,6 +77,8 @@ namespace ChampionsShell
             ModHooks.NewGameHook += () => ResetCharm();
             // Starts the Finishing Blow ability, which needs the tracker for enemies' max HP (FinishingBlow.cs).
             new FinishingBlow(newCharm, tracker).Hook();
+            // Starts the charm upgrade at the Nailsmith (NailsmithUpgrade.cs).
+            new NailsmithUpgrade(newCharm).Hook();
             // Sets up local test cheats if TestCheats.cs exists; otherwise the compiler removes this call.
             SetUpTestCheats();
             // Writes to ModLog.txt in the copy's save folder (Modding.Loggable.Log); seeing this line proves the mod loaded
